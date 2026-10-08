@@ -27,6 +27,9 @@ jobs:
           persist-credentials: false
       - name: Prepare identical verification environment
         run: |
+          # Forks may not contain the upstream tag required by verify-git-tag.
+          git fetch https://github.com/kubernetes-sigs/kueue.git \
+            refs/tags/v0.21.0-devel:refs/tags/v0.21.0-devel
           docker pull "$VERIFY_IMAGE"
           mkdir -p "$RUNNER_TEMP/verify-results"
           {
