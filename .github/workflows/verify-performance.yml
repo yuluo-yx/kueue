@@ -1,0 +1,73 @@
+name: Verify performance comparison
+
+on:
+  push:
+    branches: [1008-yuluo/ci-optimzie]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.repository == 'yuluo-yx/kueue'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [baseline, optimized]
+    env:
+      VERIFY_IMAGE: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20261005-65725656a4-master
+      BASELINE_SHA: 7220d6bdd8e32ea2077e70759c442c5d6b4a2099
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.variant == 'baseline' && env.BASELINE_SHA || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare identical verification environment
+        run: |
+          docker pull "$VERIFY_IMAGE"
+          mkdir -p "$RUNNER_TEMP/verify-results"
+          {
+            git rev-parse HEAD
+            nproc
+            free -h
+            df -h
+            docker image inspect "$VERIFY_IMAGE" --format '{{json .RepoDigests}}'
+          } > "$RUNNER_TEMP/verify-results/environment.txt"
+      - name: Run full verification with cold caches
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          # Use identical paths for host-socket Docker bind mounts in both variants.
+          started=$(date +%s)
+          set +e
+          docker run --rm --cpus=4 --memory=10g \
+            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -w "$GITHUB_WORKSPACE" \
+            -e CI=true -e GOMAXPROCS=4 -e MAKE_TIMING=1 \
+            -e "ARTIFACTS=$GITHUB_WORKSPACE/.ci-artifacts" \
+            "$VERIFY_IMAGE" bash -c \
+            'git config --global --add safe.directory "$PWD"; exec runner.sh make verify' \
+            2>&1 | tee "$RUNNER_TEMP/verify-results/build-log.txt"
+          status=${PIPESTATUS[0]}
+          set -e
+          duration=$(($(date +%s) - started))
+          printf 'variant=%s\nstatus=%s\nduration_seconds=%s\n' \
+            "$VARIANT" "$status" "$duration" > "$RUNNER_TEMP/verify-results/result.txt"
+          {
+            echo "### $VARIANT"
+            echo "Exit status: $status; verification container elapsed time: ${duration}s."
+            echo 'Four CPUs, 10 GiB, cold caches; image pull excluded.'
+            echo 'Docker checks use the host daemon; this is not a seven-CPU Prow reproduction.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+      - name: Save timing and verification logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verify-${{ matrix.variant }}
+          path: ${{ runner.temp }}/verify-results
+          retention-days: 14
