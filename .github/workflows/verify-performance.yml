@@ -43,13 +43,13 @@ jobs:
           # Use identical paths for host-socket Docker bind mounts in both variants.
           started=$(date +%s)
           set +e
-          docker run --rm --cpus=4 --memory=10g \
+          docker run --rm --entrypoint /bin/bash --cpus=4 --memory=10g \
             -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -w "$GITHUB_WORKSPACE" \
             -e CI=true -e GOMAXPROCS=4 -e MAKE_TIMING=1 \
             -e "ARTIFACTS=$GITHUB_WORKSPACE/.ci-artifacts" \
-            "$VERIFY_IMAGE" bash -c \
+            "$VERIFY_IMAGE" -c \
             'git config --global --add safe.directory "$PWD"; exec runner.sh make verify' \
             2>&1 | tee "$RUNNER_TEMP/verify-results/build-log.txt"
           status=${PIPESTATUS[0]}
