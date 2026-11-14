@@ -970,6 +970,45 @@ const (
 	//   them to the Workloads of the LeaderWorkerSet and, in MultiKueue, to the
 	//   remote Workloads and LeaderWorkerSet.
 	AllowAddingPodTemplateTolerations featuregate.Feature = "AllowAddingPodTemplateTolerations"
+
+	// owner: @HristoMohamed
+	// pr: https://github.com/kubernetes-sigs/kueue/pull/18516
+	//
+	// Break ties between equal-capacity TAS topology domains by comparing
+	// ancestor free capacity bottom-up (ascending) before falling back to
+	// alphabetical domain names, so smaller or partially-occupied parent
+	// domains are packed before splitting larger intact ancestor blocks.
+	TASAncestorCapacityTieBreak featuregate.Feature = "TASAncestorCapacityTieBreak"
+
+	// owner: @k-ngs
+	// issue: https://github.com/kubernetes-sigs/kueue/issues/11863
+	//
+	// MultiKueueJobSuspendedWorkaroundDisabled disables the workaround that patches
+	// JobSuspended=True on the local Job for compatibility with Kubernetes 1.36.0 and 1.36.1.
+	// Enable this gate when running on Kubernetes 1.36.2+ where the underlying issue
+	// (kubernetes/kubernetes#139281) is fixed.
+	MultiKueueJobSuspendedWorkaroundDisabled featuregate.Feature = "MultiKueueJobSuspendedWorkaroundDisabled"
+
+	// owner: @henry3260
+	// pr: https://github.com/kubernetes-sigs/kueue/pull/18250#discussion_r4512379423
+	//
+	// Rejects spec.groupIdentity Hash on a LeaderWorkerSet that is created under
+	// Kueue management, or that an update brings under Kueue management. It also
+	// warns on updates of an already managed Hash LeaderWorkerSet, and skips the
+	// default LocalQueue on updates of a Hash LeaderWorkerSet without a queue name.
+	// Kueue does not support Hash: the leader Pods run without admission, while the
+	// worker Pods stay gated. Disable this gate to accept that the leader Pods run
+	// without admission.
+	LeaderWorkerSetRejectGroupIdentityHash featuregate.Feature = "LeaderWorkerSetRejectGroupIdentityHash"
+
+	// owner: @thc1006
+	// pr: https://github.com/kubernetes-sigs/kueue/pull/16459#discussion_r4564454144
+	//
+	// Makes the WorkloadPriorityClass controller watch Workloads and requeue the
+	// class of a Workload whose priority differs from the class value, which also
+	// sets back a priority changed directly on the Workload. Disable this gate to
+	// keep such a priority until the class is reconciled again.
+	WorkloadPriorityClassWatchesWorkloads featuregate.Feature = "WorkloadPriorityClassWatchesWorkloads"
 )
 
 func init() {
@@ -1509,6 +1548,22 @@ var defaultVersionedFeatureGates = map[featuregate.Feature]featuregate.Versioned
 	},
 
 	AllowAddingPodTemplateTolerations: {
+		{Version: version.MustParse("0.21"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	TASAncestorCapacityTieBreak: {
+		{Version: version.MustParse("0.21"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	MultiKueueJobSuspendedWorkaroundDisabled: {
+		{Version: version.MustParse("0.21"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	LeaderWorkerSetRejectGroupIdentityHash: {
+		{Version: version.MustParse("0.21"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	WorkloadPriorityClassWatchesWorkloads: {
 		{Version: version.MustParse("0.21"), Default: true, PreRelease: featuregate.Beta},
 	},
 }
